@@ -1,0 +1,1380 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'none'; img-src 'self' data: blob:; frame-ancestors 'none'; form-action 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Virex Vault — Local File Encryption</title>
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="color-scheme" content="dark">
+  <style>
+    :root {
+      --s0: #0B0D12;
+      --s1: #10131A;
+      --s2: #151922;
+      --s3: #1B202C;
+      --s4: #232938;
+      --ink: #EDEEF2;
+      --ink-2: #C7CBD6;
+      --dim: #7A8194;
+      --dimmer: #4A5163;
+      --line: rgba(255,255,255,.06);
+      --line-2: rgba(255,255,255,.12);
+      --line-3: rgba(255,255,255,.22);
+      --accent: #0A84FF;
+      --accent-2: #5CB6FF;
+      --accent-bg: rgba(10,132,255,.08);
+      --ok: #30D158;
+      --warn: #FF375F;
+      --amber: #FFB340;
+      --purple: #BF5AF2;
+      --radius: 8px;
+      --radius-lg: 8px;
+      --serif: ui-serif,"Iowan Old Style","Apple Garamond",Baskerville,Georgia,"Times New Roman",serif;
+      --sans: -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      --mono: ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+      --shadow-card: 0 1px 0 rgba(255,255,255,.04) inset, 0 24px 60px -24px rgba(0,0,0,.9);
+      --shadow-glow: 0 0 80px -20px rgba(10,132,255,.35);
+    }
+    * { box-sizing: border-box }
+    html, body {
+      margin: 0; padding: 0; background: var(--s0); color: var(--ink);
+      font-family: var(--sans); font-size: 15px; line-height: 1.55;
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    }
+    body { min-height: 100vh; overflow-x: hidden }
+    a { color: inherit; text-decoration: none }
+    code {
+      font-family: var(--mono); font-size: .9em; background: rgba(255,255,255,.06);
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .container { max-width: 1320px; margin: 0 auto; padding: 0 32px }
+
+    /* Topbar */
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(11, 13, 18, 0.72); backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--line);
+    }
+    .topbar-in {
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      align-items: center; gap: 20px; padding: 14px 32px; max-width: 1320px; margin: 0 auto;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      font-family: var(--mono); font-size: 11px; color: var(--ink);
+      letter-spacing: .16em; text-transform: uppercase; font-weight: 600;
+    }
+    .brand .mark {
+      width: 22px; height: 22px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--purple));
+      display: grid; place-items: center; color: #fff; font-family: var(--serif);
+      font-style: italic; font-size: 14px; font-weight: 400;
+      box-shadow: 0 4px 12px -4px var(--accent);
+    }
+    .brand small { color: var(--dim); font-weight: 400 }
+    .topnav { display: flex; gap: 4px; justify-self: center }
+    .topnav a {
+      padding: 8px 14px; border-radius: 8px; font-family: var(--mono);
+      font-size: 11px; color: var(--dim); letter-spacing: .1em; text-transform: uppercase;
+      transition: .15s;
+    }
+    .topnav a:hover { color: var(--ink); background: var(--s2) }
+    .status {
+      display: flex; align-items: center; gap: 12px; justify-self: end;
+      font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .status .live {
+      display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+      background: rgba(48, 209, 88, .1); border: 1px solid rgba(48, 209, 88, .25);
+      border-radius: 999px; color: var(--ok);
+    }
+    .status .live .dot {
+      width: 6px; height: 6px; border-radius: 999px; background: var(--ok);
+      box-shadow: 0 0 10px var(--ok); animation: pulse 2.4s ease-in-out infinite;
+    }
+    .status .netmon { display: flex; align-items: center; gap: 6px }
+    .status .netmon .n { color: var(--ok); font-weight: 600 }
+    .status .netmon.blocked .n { color: var(--warn); animation: flash .5s }
+    @keyframes pulse { 0%, 100% { opacity: .4 } 50% { opacity: 1 } }
+    @keyframes flash { 50% { transform: scale(1.4) } }
+
+    /* Hero */
+    .hero {
+      position: relative; background: var(--s1);
+      border-bottom: 1px solid var(--line); overflow: hidden;
+    }
+    .hero-in {
+      position: relative; padding: 96px 32px 72px; max-width: 1320px;
+      margin: 0 auto; display: grid; grid-template-columns: 1.4fr 1fr; gap: 64px;
+      align-items: end;
+    }
+    .kicker {
+      font-family: var(--mono); font-size: 11px; color: var(--dim);
+      letter-spacing: .2em; text-transform: uppercase; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .kicker::before { content: ""; width: 32px; height: 1px; background: var(--dim) }
+    .wordmark {
+      font-family: var(--serif); font-weight: 400; font-size: clamp(72px, 10vw, 144px);
+      line-height: .9; margin: 0; letter-spacing: -.03em; font-style: italic;
+    }
+    .wordmark b {
+      font-style: normal; font-weight: 400; color: var(--accent);
+      text-shadow: 0 0 40px rgba(10,132,255,.6);
+    }
+    .lede { color: var(--ink-2); font-size: 20px; line-height: 1.5; margin: 32px 0 0; max-width: 52ch; font-weight: 300 }
+    .lede em { color: var(--ink); font-style: normal; font-weight: 500 }
+    .hero-side { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px }
+    .hero-stat {
+      background: var(--s2); border: 1px solid var(--line-2);
+      border-radius: var(--radius); padding: 16px 20px;
+      display: flex; justify-content: space-between; align-items: center; gap: 16px;
+      box-shadow: var(--shadow-card); transition: .2s;
+    }
+    .hero-stat:hover { border-color: var(--line-3); transform: translateX(-4px) }
+    .hero-stat .label { font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .14em; text-transform: uppercase }
+    .hero-stat .value { font-family: var(--mono); font-size: 13px; color: var(--ink); font-weight: 600 }
+    .hero-stat .value.ok { color: var(--ok) }
+    .hero-stat .value.blue { color: var(--accent-2) }
+    .trust-bar {
+      position: relative; padding: 20px 32px; max-width: 1320px;
+      margin: 0 auto; display: flex; flex-wrap: wrap; gap: 32px;
+      font-family: var(--mono); font-size: 12px; color: var(--dim);
+      letter-spacing: .06em; border-top: 1px solid var(--line);
+    }
+    .trust-bar span { display: flex; align-items: center; gap: 8px }
+    .trust-bar .tick {
+      width: 14px; height: 14px; border-radius: 999px;
+      background: var(--ok); display: grid; place-items: center; color: #0a0c11;
+      font-size: 9px; font-weight: 900;
+    }
+
+    /* Section Header */
+    .section { position: relative; padding: 80px 0; border-bottom: 1px solid var(--line) }
+    .section.deep { background: var(--s0) }
+    .section.mid { background: var(--s1) }
+    .section-h { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 32px; margin-bottom: 40px }
+    .section-h .lbl { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .2em; text-transform: uppercase; display: flex; align-items: center; gap: 12px }
+    .section-h .lbl .num { color: var(--accent); font-weight: 600 }
+    .section-h .title { font-family: var(--serif); font-weight: 400; font-size: 44px; font-style: italic; letter-spacing: -.02em; margin: 0; line-height: 1; text-align: center }
+    .section-h .aside { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .14em; text-transform: uppercase; text-align: right }
+
+    /* Tool Area */
+    .tool-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 24px }
+    .panel { background: var(--s2); border: 1px solid var(--line-2); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-card); display: flex; flex-direction: column }
+    .panel-h { padding: 18px 24px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, rgba(255,255,255,.02), transparent) }
+    .panel-title { font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .18em; text-transform: uppercase; display: flex; align-items: center; gap: 10px }
+    .panel-title strong { color: var(--ink); font-weight: 600 }
+    .panel-h .actions { display: flex; gap: 6px }
+    .panel-h .icon-btn { background: none; border: 0; color: var(--dim); cursor: pointer; font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; padding: 4px 8px; border-radius: 8px; transition: .15s }
+    .panel-h .icon-btn:hover { color: var(--ink); background: var(--s3) }
+    .panel-body { padding: 24px; flex: 1 }
+    .mode { display: flex; gap: 2px; padding: 3px; background: var(--s1); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 24px }
+    .mode button { flex: 1; padding: 10px 16px; background: transparent; border: 0; color: var(--dim); cursor: pointer; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 500; transition: .15s; display: flex; align-items: center; justify-content: center; gap: 8px }
+    .mode button:hover { color: var(--ink) }
+    .mode button.on { background: var(--s3); color: var(--ink); box-shadow: 0 1px 0 rgba(255,255,255,.06) inset }
+    .setting { margin-bottom: 18px }
+    .setting-label { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 8px }
+    .setting-label .hint { color: var(--dimmer); text-transform: none; letter-spacing: .02em }
+    .segs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; padding: 3px; background: var(--s1); border: 1px solid var(--line); border-radius: var(--radius) }
+    .segs button { padding: 8px 12px; background: transparent; border: 0; color: var(--dim); cursor: pointer; border-radius: 8px; font: inherit; font-size: 12.5px; transition: .15s }
+    .segs button:hover { color: var(--ink) }
+    .segs button.on { background: var(--ink); color: #0B0D12; font-weight: 600 }
+    .drop { display: block; border: 1.5px dashed var(--line-2); border-radius: var(--radius); padding: 32px 20px; cursor: pointer; transition: .2s; background: var(--s1); text-align: center; margin-top: 8px }
+    .drop:hover, .drop.drag { border-color: var(--accent); background: var(--accent-bg); box-shadow: 0 0 0 4px var(--accent-bg) }
+    .drop .icon { width: 40px; height: 40px; margin: 0 auto 12px; border-radius: 8px; background: var(--s3); border: 1px solid var(--line-2); display: grid; place-items: center; color: var(--ink) }
+    .drop .primary { font-size: 15px; color: var(--ink); font-weight: 500 }
+    .drop .meta { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 6px; letter-spacing: .02em }
+    input[type=file] { display: none }
+    .textarea { width: 100%; background: var(--s1); border: 1px solid var(--line-2); color: var(--ink); padding: 14px 16px; border-radius: var(--radius); font-family: var(--mono); font-size: 13px; line-height: 1.6; min-height: 160px; resize: vertical; outline: none; transition: .15s }
+    .textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg) }
+    .input { width: 100%; background: var(--s1); border: 1px solid var(--line-2); color: var(--ink); padding: 12px 14px; border-radius: var(--radius); font-family: var(--mono); font-size: 13.5px; letter-spacing: .04em; outline: none; transition: .15s }
+    .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg) }
+    .input::placeholder { color: var(--dimmer) }
+    .input:disabled { opacity: .4; cursor: not-allowed }
+    .filelist { margin-top: 12px; display: flex; flex-direction: column; gap: 6px }
+    .fileitem { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; background: var(--s3); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius); font-family: var(--mono); font-size: 12px }
+    .fileitem .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink) }
+    .fileitem .s { color: var(--dim); flex: none }
+    .fileitem .rm { background: none; border: 0; color: var(--dim); cursor: pointer; font: inherit; padding: 0 0 0 8px; font-size: 16px; line-height: 1 }
+    .fileitem .rm:hover { color: var(--warn) }
+    .pwrow { display: flex; gap: 12px; align-items: center; margin-top: 10px; font-family: var(--mono); font-size: 11px; color: var(--dim) }
+    .pwbar { flex: 1; height: 4px; background: var(--s1); border-radius: 8px; overflow: hidden }
+    .pwbar div { height: 100%; width: 0; background: var(--warn); transition: .3s; border-radius: 8px }
+    .pwbar div.s1 { width: 25%; background: var(--warn) }
+    .pwbar div.s2 { width: 50%; background: var(--amber) }
+    .pwbar div.s3 { width: 75%; background: var(--accent) }
+    .pwbar div.s4 { width: 100%; background: var(--ok) }
+    .pwrow .lbl { min-width: 80px; text-align: right }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border-radius: var(--radius); border: 1px solid var(--line-2); background: var(--s3); color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer; transition: .15s; font-weight: 500; -webkit-appearance: none; appearance: none }
+    .btn:hover { background: var(--s4); border-color: var(--line-3) }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; box-shadow: 0 8px 24px -8px var(--accent) }
+    .btn.primary:hover { background: #1a90ff; box-shadow: 0 12px 32px -8px var(--accent) }
+    .btn.primary:disabled { background: var(--s3); color: var(--dim); border-color: var(--line); box-shadow: none; cursor: not-allowed }
+    .btn:disabled { opacity: .45; cursor: not-allowed }
+    .btn.large { padding: 14px 24px; font-size: 14px; width: 100% }
+    .btn .arrow { font-family: var(--mono); opacity: .85 }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px }
+    .btn-row .btn { flex: 1; min-width: 110px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 10px 12px }
+    .progress { margin-top: 14px; height: 3px; background: var(--s1); border-radius: 8px; overflow: hidden; display: none }
+    .progress.on { display: block; }
+    .progress .bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .2s ease; border-radius: 8px }
+    .info { margin-top: 14px; padding: 12px 16px; border-radius: var(--radius); background: var(--accent-bg); border: 1px solid rgba(10,132,255,.2); font-size: 13px; color: var(--ink-2); line-height: 1.5 }
+    .info b { color: var(--ink); font-weight: 600 }
+    .keybox { padding: 16px 18px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--s3); font-family: var(--mono); font-size: 13.5px; letter-spacing: .08em; word-break: break-all; user-select: all; line-height: 1.75; color: var(--ink); position: relative }
+    .keybox::before { content: "AES-256 KEY"; position: absolute; top: -8px; left: 12px; background: var(--s2); padding: 0 8px; font-family: var(--mono); font-size: 9.5px; color: var(--accent); letter-spacing: .18em; font-weight: 600 }
+    .keynote { margin-top: 12px; font-size: 12.5px; color: var(--dim); line-height: 1.55 }
+    .keynote b { color: var(--warn); font-weight: 600 }
+
+    /* Output & Live Panel */
+    .live-panel { position: sticky; top: 88px; align-self: start }
+    .live-panel .panel-body { padding: 0; display: flex; flex-direction: column; max-height: calc(100vh - 200px) }
+    .live-stat { display: grid; grid-template-columns: 1fr 1fr 1fr; border-bottom: 1px solid var(--line); background: var(--s1) }
+    .live-stat > div { padding: 14px 16px; text-align: center; border-right: 1px solid var(--line) }
+    .live-stat > div:last-child { border-right: 0 }
+    .live-stat .k { font-family: var(--mono); font-size: 9.5px; color: var(--dim); letter-spacing: .16em; text-transform: uppercase; margin-bottom: 4px }
+    .live-stat .v { font-family: var(--mono); font-size: 15px; color: var(--ink); font-weight: 600 }
+    .live-stat .v.ok { color: var(--ok) }
+    .live-stat .v.warn { color: var(--warn) }
+    .live-content { padding: 18px 20px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent }
+    .live-content::-webkit-scrollbar { width: 6px }
+    .live-content::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 8px }
+    .live-empty { padding: 48px 20px; text-align: center; color: var(--dimmer); font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em }
+    .live-section { margin-bottom: 18px }
+    .live-section:last-child { margin-bottom: 0 }
+    .live-section-h { font-family: var(--mono); font-size: 10px; color: var(--dim); letter-spacing: .18em; text-transform: uppercase; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between }
+    .log-body { font-family: var(--mono); font-size: 11.5px; line-height: 1.75; color: var(--dim); max-height: 200px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent }
+    .log-body::-webkit-scrollbar { width: 4px }
+    .log-body::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 8px }
+    .log-line { white-space: pre-wrap; word-break: break-word }
+    .log-line .t { color: var(--dimmer); margin-right: 8px }
+    .log-line .g { color: var(--dim) }
+    .log-line.info { color: var(--ink) }
+    .log-line.ok { color: var(--ok) }
+    .log-line.err { color: var(--warn) }
+    .log-line .a { color: var(--accent-2) }
+    .preview { padding: 14px; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--s3) }
+    .preview .ph { font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .14em; text-transform: uppercase; margin-bottom: 10px }
+    .preview img { max-width: 100%; height: auto; display: block; border-radius: 8px }
+    .preview pre { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--ink); white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; background: var(--s1); padding: 12px; border-radius: 8px }
+
+    /* Anatomy Viz */
+    .anatomy-viz { background: var(--s2); border: 1px solid var(--line-2); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow-card) }
+    .bytes { display: grid; grid-template-columns: 4fr 1fr 1fr 1fr 1fr 16fr 4fr 12fr 32fr; gap: 2px; margin-bottom: 8px; font-family: var(--mono); min-height: 80px }
+    .byte { background: var(--s3); border-top: 2px solid var(--accent); padding: 10px 8px; display: flex; flex-direction: column; justify-content: space-between; border-radius: 0 0 4px 4px; transition: .2s; cursor: default; min-width: 0 }
+    .byte:hover { background: var(--s4); border-top-color: var(--accent-2); transform: translateY(-2px); box-shadow: 0 8px 20px -8px var(--accent) }
+    .byte .label { font-size: 10px; color: var(--dim); letter-spacing: .1em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .byte .val { font-size: 12px; color: var(--ink); font-weight: 600; margin-top: 8px }
+    .byte .sz { font-size: 9.5px; color: var(--dimmer); margin-top: 2px }
+    .byte.ct { background: linear-gradient(180deg, var(--s3), var(--s2)); border-top-color: var(--purple) }
+    .anatomy-legend { margin-top: 32px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; font-family: var(--mono); font-size: 12px }
+    .anatomy-legend > div { padding: 12px 14px; background: var(--s1); border: 1px solid var(--line); border-radius: var(--radius); color: var(--dim) }
+    .anatomy-legend b { color: var(--ink); display: block; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px; font-weight: 600 }
+    .anatomy-legend b .swatch { display: inline-block; width: 10px; height: 10px; background: var(--accent); border-radius: 2px; margin-right: 8px; vertical-align: middle }
+
+    /* Why Grid */
+    .why-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px }
+    .why-card { background: var(--s2); border: 1px solid var(--line-2); border-radius: var(--radius-lg); padding: 28px; transition: .25s; box-shadow: var(--shadow-card); position: relative; overflow: hidden }
+    .why-card:hover { border-color: var(--line-3); transform: translateY(-4px); box-shadow: var(--shadow-card), 0 20px 40px -20px rgba(10,132,255,.4) }
+    .why-card .num { font-family: var(--mono); font-size: 44px; color: var(--dimmer); line-height: 1; font-weight: 200; letter-spacing: -.04em; margin-bottom: 20px; transition: .25s }
+    .why-card:hover .num { color: var(--accent) }
+    .why-card h4 { margin: 0 0 10px; font-family: var(--serif); font-weight: 400; font-size: 20px; font-style: italic; letter-spacing: -.01em; color: var(--ink) }
+    .why-card p { margin: 0; color: var(--dim); font-size: 13.5px; line-height: 1.6 }
+    .why-card p b { color: var(--ink-2); font-weight: 500 }
+
+    /* Details Accordeons */
+    .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+    details { background: var(--s2); border: 1px solid var(--line-2); border-radius: var(--radius-lg); padding: 0; transition: .2s; overflow: hidden }
+    details:hover { border-color: var(--line-3) }
+    details[open] { background: var(--s2); border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-bg) }
+    details summary { list-style: none; cursor: pointer; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; font-size: 14.5px; color: var(--ink); font-weight: 500 }
+    details summary::-webkit-details-marker { display: none }
+    details summary::after { content: "+"; font-family: var(--mono); font-size: 20px; color: var(--dim); transition: .2s; line-height: 1 }
+    details[open] summary::after { content: "−"; color: var(--accent) }
+    details .content { padding: 0 24px 20px; font-size: 13.5px; color: var(--dim); line-height: 1.65 }
+    details .content p { margin: 0 0 10px }
+    details .content .yes { color: var(--ok); font-weight: 600 }
+    details .content .no { color: var(--warn); font-weight: 600 }
+
+    /* Footer */
+    footer { background: var(--s0); padding: 56px 0 32px; border-top: 1px solid var(--line) }
+    .footer-in { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 48px; padding: 0 32px; max-width: 1320px; margin: 0 auto }
+    .footer-brand h3 { font-family: var(--serif); font-weight: 400; font-size: 32px; font-style: italic; margin: 0 0 8px; letter-spacing: -.02em }
+    .footer-brand h3 b { color: var(--accent) }
+    .footer-brand p { color: var(--dim); font-size: 13px; line-height: 1.6; margin: 0; max-width: 32ch }
+    .footer-col h5 { font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .18em; text-transform: uppercase; margin: 0 0 14px; font-weight: 600 }
+    .footer-col ul { list-style: none; padding: 0; margin: 0 }
+    .footer-col li { margin-bottom: 8px }
+    .footer-col a { color: var(--ink-2); font-size: 13px; transition: .15s }
+    .footer-col a:hover { color: var(--accent) }
+    .footer-bottom { max-width: 1320px; margin: 40px auto 0; padding: 24px 32px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: .14em; text-transform: uppercase; flex-wrap: wrap; gap: 12px }
+
+    /* Utilities & Fallbacks */
+    .hidden { display: none !important }
+    #blocker { position: fixed; inset: 0; background: var(--s0); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; text-align: center }
+    #blocker.show { display: flex }
+    #blocker h3 { font-family: var(--serif); font-size: 42px; font-weight: 400; font-style: italic; color: var(--warn); margin: 0 0 12px }
+    #blocker p { color: var(--dim); max-width: 40ch; margin: 0; font-size: 15px }
+    #fullDrop { position: fixed; inset: 0; background: rgba(7, 8, 12, 0.94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 100; display: none; align-items: center; justify-content: center; pointer-events: none; padding: 20px }
+    #fullDrop.on { display: flex }
+    #fullDrop .box { border: 2px dashed var(--accent); border-radius: 8px; padding: 80px 120px; background: var(--accent-bg); font-family: var(--serif); font-style: italic; font-size: 44px; color: var(--ink); box-shadow: 0 0 100px var(--accent) }
+
+    @media (prefers-reduced-motion: reduce) {
+      .status .live .dot, .pwbar div, .progress .bar, .byte, .why-card, .hero-stat {
+        animation: none !important; transition: none !important;
+      }
+    }
+
+    /* Responsive Constraints */
+    @media (max-width: 1100px) {
+      .tool-grid { grid-template-columns: 1fr }
+      .live-panel { position: static }
+      .live-panel .panel-body { max-height: none }
+      .hero-in { grid-template-columns: 1fr; gap: 40px }
+      .why-grid { grid-template-columns: repeat(2, 1fr) }
+      .footer-in { grid-template-columns: 1fr 1fr; gap: 32px }
+      .bytes { grid-template-columns: 1fr; gap: 6px }
+      .byte { flex-direction: row; justify-content: space-between; align-items: center; border-top: 0; border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0 }
+      .byte .val { margin-top: 0 }
+      .anatomy-legend { grid-template-columns: 1fr }
+    }
+    @media (max-width: 720px) {
+      .container, .topbar-in, .hero-in, .trust-bar, .footer-in, .footer-bottom { padding-left: 20px; padding-right: 20px }
+      .topnav { display: none }
+      .topbar-in { grid-template-columns: auto 1fr }
+      .section { padding: 56px 0 }
+      .section-h { grid-template-columns: 1fr; gap: 12px; text-align: left }
+      .section-h .title { text-align: left; font-size: 32px }
+      .section-h .aside { text-align: left }
+      .hero-in { padding: 56px 20px 40px }
+      .lede { font-size: 17px }
+      .why-grid, .details-grid { grid-template-columns: 1fr }
+      .footer-in { grid-template-columns: 1fr }
+      .details-grid { gap: 8px }
+      .anatomy-viz { padding: 20px }
+    }
+  </style>
+</head>
+<body>
+
+<div id="blocker" role="alertdialog">
+  <div>
+    <h3>Insecure Context.</h3>
+    <p id="bmsg">Vault requires HTTPS and cannot run inside an iframe.</p>
+  </div>
+</div>
+
+<div id="fullDrop">
+  <div class="box">Drop file here</div>
+</div>
+
+<!-- Topbar Navigation -->
+<header class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <div class="mark">V</div>
+      <span>Virex Vault <small>· v2.0</small></span>
+    </div>
+    <nav class="topnav">
+      <a href="#tool">Tool</a>
+      <a href="#anatomy">Anatomy</a>
+      <a href="#why">Why</a>
+      <a href="#details">Security</a>
+    </nav>
+    <div class="status">
+      <span class="netmon" id="netmon">Network <span class="n" id="netn">0</span></span>
+      <span class="live"><span class="dot"></span>SECURE</span>
+    </div>
+  </div>
+</header>
+
+<!-- Hero Section -->
+<section class="hero">
+  <div class="hero-in">
+    <div>
+      <div class="kicker">A tool by Virex · No. 002</div>
+      <h1 class="wordmark">Vault<b>.</b></h1>
+      <p class="lede">
+        <em>Encrypt any file directly in your browser.</em>
+        Nothing is uploaded, stored, or intercepted — and you can verify this live in your Network tab.
+      </p>
+    </div>
+    <aside class="hero-side" aria-label="System status">
+      <div class="hero-stat">
+        <span class="label">Cipher</span>
+        <span class="value blue">AES-256-GCM</span>
+      </div>
+      <div class="hero-stat">
+        <span class="label">KDF</span>
+        <span class="value">PBKDF2 · 600k iter</span>
+      </div>
+      <div class="hero-stat">
+        <span class="label">Network</span>
+        <span class="value ok" id="heroNet">0 requests</span>
+      </div>
+      <div class="hero-stat">
+        <span class="label">Mode</span>
+        <span class="value">100% local</span>
+      </div>
+    </aside>
+  </div>
+  <div class="trust-bar">
+    <span><span class="tick">✓</span>No Backend</span>
+    <span><span class="tick">✓</span>No Account</span>
+    <span><span class="tick">✓</span>No Cookies</span>
+    <span><span class="tick">✓</span>No Tracking</span>
+    <span><span class="tick">✓</span>Offline-Capable</span>
+    <span><span class="tick">✓</span>Open Format</span>
+  </div>
+</section>
+
+<!-- Cryptographic Tool Console -->
+<section class="section mid" id="tool">
+  <div class="container">
+    <div class="section-h">
+      <div class="lbl"><span class="num">/ 01</span>Tool</div>
+      <h2 class="title">Encrypt or Decrypt.</h2>
+      <div class="aside">Completely local · instant</div>
+    </div>
+    <div class="tool-grid">
+      
+      <!-- Operations Panel -->
+      <div class="panel">
+        <div class="panel-h">
+          <span class="panel-title"><strong>Tool</strong> · File / Text</span>
+          <div class="actions">
+            <button class="icon-btn" id="resetBtn">reset</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <nav class="mode" role="tablist">
+            <button class="on" data-tab="enc">→ Encrypt</button>
+            <button data-tab="dec">← Decrypt</button>
+          </nav>
+          
+          <!-- Encrypt Sub-Panel -->
+          <section id="enc">
+            <div class="setting">
+              <div class="setting-label"><span>Content</span></div>
+              <div class="segs" data-group="content">
+                <button class="on" data-val="file">Files</button>
+                <button data-val="text">Text</button>
+              </div>
+            </div>
+            <div class="setting">
+              <div class="setting-label">
+                <span>Lock</span>
+                <span class="hint">choose your security level</span>
+              </div>
+              <div class="segs" data-group="lock">
+                <button class="on" data-val="key">Random Key</button>
+                <button data-val="pw">Password</button>
+              </div>
+            </div>
+            <div class="setting">
+              <div class="setting-label"><span>Input</span></div>
+              <div id="encFileBox">
+                <label class="drop" id="encDrop">
+                  <div class="icon">↑</div>
+                  <div class="primary">Select files or drag them here</div>
+                  <div class="meta">multiple files = one bundle · max 1 GB · stays local</div>
+                  <input type="file" id="encFile" multiple />
+                </label>
+                <div class="filelist" id="encFileList"></div>
+              </div>
+              <div id="encTextBox" class="hidden">
+                <textarea class="textarea" id="encText"
+                  placeholder="Enter message — will be encrypted and downloaded as .vrx"></textarea>
+              </div>
+            </div>
+            <div class="setting hidden" id="encPwStep">
+              <div class="setting-label"><span>Password</span><span class="hint">min. 6 characters</span></div>
+              <input class="input" type="password" id="encPw"
+                placeholder="Secure password" autocomplete="new-password"
+                spellcheck="false" autocapitalize="off" autocorrect="off" />
+              <div class="pwrow">
+                <div class="pwbar"><div id="pwbar"></div></div>
+                <span class="lbl" id="pwlabel">—</span>
+              </div>
+            </div>
+            <button class="btn primary large" id="encBtn" disabled>
+              Encrypt<span class="arrow">→</span>
+            </button>
+            <div class="progress" id="encProg"><div class="bar"></div></div>
+          </section>
+
+          <!-- Decrypt Sub-Panel -->
+          <section id="dec" class="hidden">
+            <div class="setting">
+              <div class="setting-label"><span>.vrx File</span></div>
+              <label class="drop" id="decDrop">
+                <div class="icon"></div>
+                <div class="primary">Select .vrx file or drag it here</div>
+                <div class="meta">will be analyzed after selection</div>
+                <input type="file" id="decFile" accept=".vrx" />
+              </label>
+              <div class="filelist hidden" id="decFileList"></div>
+              <div class="info hidden" id="decInfo"></div>
+            </div>
+            <div class="setting">
+              <div class="setting-label"><span>Key or Password</span></div>
+              <input class="input" type="password" id="decSecret"
+                placeholder="Will be enabled after file selection"
+                spellcheck="false" autocomplete="off" autocapitalize="off" autocorrect="off"
+                disabled />
+            </div>
+            <button class="btn primary large" id="decBtn" disabled>
+              Decrypt<span class="arrow">→</span>
+            </button>
+            <div class="progress" id="decProg"><div class="bar"></div></div>
+          </section>
+        </div>
+      </div>
+
+      <!-- Live Log Sidebar -->
+      <aside class="panel live-panel">
+        <div class="panel-h">
+          <span class="panel-title"><strong>Live</strong> · Output &amp; Log</span>
+          <div class="actions">
+            <button class="icon-btn" id="clearLog">clear</button>
+          </div>
+        </div>
+        <div class="live-stat">
+          <div>
+            <div class="k">Net</div>
+            <div class="v ok" id="statNet">0</div>
+          </div>
+          <div>
+            <div class="k">Ops</div>
+            <div class="v" id="statOps">0</div>
+          </div>
+          <div>
+            <div class="k">Session</div>
+            <div class="v" id="statTime">00:00</div>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="live-content" id="liveContent">
+            <div class="live-section">
+              <div class="live-section-h"><span>Terminal Log</span><span id="logCount">0</span></div>
+              <div class="log-body" id="log" aria-live="polite"></div>
+            </div>
+            <div class="live-section hidden" id="keySection">
+              <div class="live-section-h"><span>Key</span><span style="color:var(--warn)">only visible now</span></div>
+              <div class="keybox" id="keyOut" aria-live="polite"></div>
+              <div class="btn-row">
+                <button class="btn" id="copyKey">Copy</button>
+                <button class="btn" id="downKey">.key</button>
+                <button class="btn" id="clearKey">Hide</button>
+              </div>
+              <p class="keynote">
+                The key is <b>never stored</b> — neither here nor on a server. Without it, the file is irretrievably lost.
+              </p>
+            </div>
+            <div class="live-section hidden" id="previewSection">
+              <div class="live-section-h"><span>Preview</span></div>
+              <div id="decResult"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- Format Anatomy Section -->
+<section class="section deep" id="anatomy">
+  <div class="container">
+    <div class="section-h">
+      <div class="lbl"><span class="num">/ 02</span>Anatomy</div>
+      <h2 class="title">Anatomy of a .vrx file.</h2>
+      <div class="aside">Byte Layout</div>
+    </div>
+    <div class="anatomy-viz">
+      <div class="bytes" role="img" aria-label="Byte layout of a .vrx file">
+        <div class="byte"><span class="label">Magic</span><span class="val">VRX\x02</span><span class="sz">4 B</span></div>
+        <div class="byte"><span class="label">Ver</span><span class="val">02</span><span class="sz">1 B</span></div>
+        <div class="byte"><span class="label">Mode</span><span class="val">01/02</span><span class="sz">1 B</span></div>
+        <div class="byte"><span class="label">KDF</span><span class="val">01</span><span class="sz">1 B</span></div>
+        <div class="byte"><span class="label">RSV</span><span class="val">00</span><span class="sz">1 B</span></div>
+        <div class="byte"><span class="label">Salt</span><span class="val">random</span><span class="sz">16 B</span></div>
+        <div class="byte"><span class="label">Iter</span><span class="val">600k</span><span class="sz">4 B</span></div>
+        <div class="byte"><span class="label">IV / Nonce</span><span class="val">random</span><span class="sz">12 B</span></div>
+        <div class="byte ct"><span class="label">Ciphertext + GCM Tag</span><span class="val">AES-256</span><span class="sz">variable</span></div>
+      </div>
+      <div class="anatomy-legend">
+        <div><b><span class="swatch"></span>Header (40 B fixed)</b>
+          Magic bytes, version, chosen mode, KDF parameters, salt, and IV — all unencrypted, but authenticated.</div>
+        <div><b><span class="swatch" style="background:var(--purple)"></span>Ciphertext</b>
+          Contains filename, MIME type, and raw data. AES-256-GCM guarantees confidentiality and tamper detection.</div>
+        <div><b><span class="swatch" style="background:var(--ok)"></span>Portable</b>
+          The format is documented, versioned, and open. Any standard AES-GCM/PBKDF2 implementation can parse .vrx files.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Values / Why Section -->
+<section class="section mid" id="why">
+  <div class="container">
+    <div class="section-h">
+      <div class="lbl"><span class="num">/ 03</span>Why Vault</div>
+      <h2 class="title">Four reasons that matter.</h2>
+      <div class="aside">Honest arguments</div>
+    </div>
+    <div class="why-grid">
+      <div class="why-card">
+        <div class="num">01</div>
+        <h4>No trust required.</h4>
+        <p>Others say "we don't store anything". Vault physically <b>can't</b> — the CSP blocks all network connections. Verifiable via DevTools.</p>
+      </div>
+      <div class="why-card">
+        <div class="num">02</div>
+        <h4>Open and portable.</h4>
+        <p>The <b>.vrx format</b> is documented and uses industry standards (AES-GCM, PBKDF2). No vendor lock-in.</p>
+      </div>
+      <div class="why-card">
+        <div class="num">03</div>
+        <h4>Two modes, one format.</h4>
+        <p>Choose a <b>256-bit random key</b> or a <b>password</b> with 600,000 PBKDF2 iterations. Both inside the same .vrx format.</p>
+      </div>
+      <div class="why-card">
+        <div class="num">04</div>
+        <h4>Works offline.</h4>
+        <p>Save the HTML file once — it runs without internet and without forced updates. You <b>own</b> the tool.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Threat Model & Legal Details -->
+<section class="section deep" id="details">
+  <div class="container">
+    <div class="section-h">
+      <div class="lbl"><span class="num">/ 04</span>Security</div>
+      <h2 class="title">All details, honestly.</h2>
+      <div class="aside">Threat Model &amp; GDPR</div>
+    </div>
+    <div class="details-grid">
+      <details>
+        <summary>What Vault protects and what it doesn't</summary>
+        <div class="content">
+          <p><span class="yes">✓ Protects against:</span> Cloud providers, backup services, lost USB drives, network attackers, and manipulated .vrx files.</p>
+          <p><span class="no">✗ Does NOT protect against:</span> compromised devices (malware, keyloggers), weak passwords, and loss of the key.</p>
+        </div>
+      </details>
+      <details>
+        <summary>How secure is the password mode?</summary>
+        <div class="content">
+          <p>PBKDF2-SHA256 with <b>600,000 iterations</b> (OWASP recommendation). With a <b>random 12+ character password</b>, brute-force attacks are practically impossible. For simple or dictionary-based passwords, even the strongest KDF cannot prevent attacks — use the random key generator in that case.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Verify this page's integrity</summary>
+        <div class="content">
+          <p>Download the HTML file and verify the SHA-256 hash against the release hash: <code>shasum -a 256 virex-vault.html</code>. Once verified, it can be run via <code>file://</code> completely offline.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Privacy &amp; GDPR</summary>
+        <div class="content">
+          <p>No personal data, no cookies, no tracking, and no third-party resources. The hosting provider only processes technically necessary access logs (IP address) in accordance with Art. 6 Para. 1 lit. f GDPR.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Legal Notice (Impressum)</summary>
+        <div class="content">
+          <p><b>Section 5 DDG:</b> [Name / Company], [Street], [ZIP Code City], Germany</p>
+          <p><b>Contact:</b> [contact@example.com] · [+49 ...]</p>
+          <p><b>Section 18 Para. 2 MStV:</b> [First and Last Name], address as above.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Why .vrx?</summary>
+        <div class="content">
+          <p>Short, unique, and recognizable. Stands for <b>Vi</b>rex + <b>e</b>ncrypted. It is identified by the magic bytes <code>VRX\x02</code> and does not conflict with any other known format.</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-in">
+    <div class="footer-brand">
+      <h3>Vault<b>.</b></h3>
+      <p>A local encryption tool by Virex. Deployed as a single HTML file — your browser is the app.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Tool</h5>
+      <ul>
+        <li><a href="#tool">Encrypt</a></li>
+        <li><a href="#tool">Decrypt</a></li>
+        <li><a href="#anatomy">.vrx Format</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Virex</h5>
+      <ul>
+        <li><a href="#">Avantahost</a></li>
+        <li><a href="#">Radionet</a></li>
+        <li><a href="#">Nexcord</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Legal</h5>
+      <ul>
+        <li><a href="#details">Legal Notice</a></li>
+        <li><a href="#details">Privacy Policy</a></li>
+        <li><a href="#details">Security</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Virex · v2.0.0</span>
+    <span>Made with intent · not with cookies</span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  'use strict';
+
+  if (window.top !== window.self) {
+    document.getElementById('bmsg').textContent = 'Running inside an iframe is not allowed.';
+    document.getElementById('blocker').classList.add('show');
+    try { window.top.location = window.self.location; } catch(_){}
+    return;
+  }
+  if (!window.isSecureContext || !window.crypto?.subtle) {
+    document.getElementById('bmsg').textContent = 'HTTPS required — WebCrypto API is not available in this context.';
+    document.getElementById('blocker').classList.add('show');
+    return;
+  }
+
+  let netBlocked = 0;
+  const bumpNet = () => {
+    netBlocked++;
+    document.getElementById('netn').textContent = netBlocked;
+    document.getElementById('heroNet').textContent = netBlocked === 1 ? '1 request' : netBlocked + ' requests';
+    document.getElementById('heroNet').className = netBlocked ? 'value warn' : 'value ok';
+    document.getElementById('statNet').textContent = netBlocked;
+    document.getElementById('statNet').className = netBlocked ? 'v warn' : 'v ok';
+    document.getElementById('netmon').classList.add('blocked');
+    log('network attempt blocked (' + netBlocked + ')', 'err');
+  };
+  window.fetch = function() { bumpNet(); return Promise.reject(new Error('blocked')); };
+  const _XHR = window.XMLHttpRequest;
+  window.XMLHttpRequest = function() { const x=new _XHR(); x.open=function(){ bumpNet(); throw new Error('blocked'); }; return x; };
+  window.WebSocket = function() { bumpNet(); throw new Error('blocked'); };
+  window.EventSource = function() { bumpNet(); throw new Error('blocked'); };
+  if (navigator.sendBeacon) navigator.sendBeacon = () => { bumpNet(); return false; };
+
+  const MAGIC_V1 = new Uint8Array([0x56,0x52,0x58,0x01]);
+  const MAGIC_V2 = new Uint8Array([0x56,0x52,0x58,0x02]);
+  const VERSION_V2 = 0x02;
+  const MODE_KEY = 0x01, MODE_PW = 0x02;
+  const KDF_NONE = 0x00, KDF_PBKDF2 = 0x01;
+  const PAYLOAD_FILE = 0x01, PAYLOAD_MULTI = 0x02, PAYLOAD_TEXT = 0x03;
+  const PBKDF2_ITERS = 600000;
+  const MAX_BYTES = 1024 * 1024 * 1024;
+  const $ = (id) => document.getElementById(id);
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  const b64 = {
+    encode: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))),
+    decode: (str) => {
+      const bin = atob(str.trim().replace(/\s+/g,''));
+      const out = new Uint8Array(bin.length);
+      for (let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+      return out;
+    }
+  };
+  const zeroize = (a) => { if (a?.fill) a.fill(0); };
+  const fmt = (b) => b<1024 ? b+' B' : b<1048576 ? (b/1024).toFixed(1)+' KB' : (b/1048576).toFixed(2)+' MB';
+  const sanitizeName = (n) => n.replace(/[/\\]/g,'_').replace(/^\.+/,'_').slice(0,255) || 'file';
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const download = (bytes, name, mime='application/octet-stream') => {
+    const blob = new Blob([bytes], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  };
+
+  const sessionStart = Date.now();
+  let opCount = 0;
+  const bumpOp = () => { opCount++; $('statOps').textContent = opCount; };
+  setInterval(() => {
+    const s = Math.floor((Date.now() - sessionStart)/1000);
+    const mm = String(Math.floor(s/60)).padStart(2,'0');
+    const ss = String(s%60).padStart(2,'0');
+    $('statTime').textContent = `${mm}:${ss}`;
+  }, 1000);
+
+  const logEl = $('log');
+  let logCount = 0;
+  function log(msg, cls='') {
+    const t = new Date();
+    const hh = String(t.getHours()).padStart(2,'0');
+    const mm = String(t.getMinutes()).padStart(2,'0');
+    const ss = String(t.getSeconds()).padStart(2,'0');
+    const line = document.createElement('div');
+    line.className = 'log-line ' + cls;
+    line.innerHTML = `<span class="t">${hh}:${mm}:${ss}</span><span class="g">›</span> ${msg}`;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+    while (logEl.childNodes.length > 250) logEl.removeChild(logEl.firstChild);
+    logCount++;
+    $('logCount').textContent = logCount;
+  }
+  $('clearLog').addEventListener('click', () => { logEl.innerHTML=''; logCount=0; $('logCount').textContent=0; log('cleared'); });
+  log('vault v2.0 · aes-256-gcm · pbkdf2-600k · offline-capable');
+  log('security · CSP blocks all network access');
+
+  $('resetBtn').addEventListener('click', () => {
+    encFiles.length = 0;
+    renderEncList();
+    $('encText').value = '';
+    $('encPw').value = '';
+    $('decSecret').value = ''; $('decSecret').disabled = true;
+    decFile = null; decHeader = null;
+    $('decFileList').classList.add('hidden');
+    $('decInfo').classList.add('hidden');
+    $('keySection').classList.add('hidden');
+    $('previewSection').classList.add('hidden');
+    $('keyOut').textContent = '';
+    $('decResult').innerHTML = '';
+    updateEncBtn(); updateDecBtn();
+    log('reset', 'info');
+  });
+
+  document.querySelectorAll('.mode button').forEach(b => {
+    b.addEventListener('click', () => switchMode(b.dataset.tab));
+  });
+  function switchMode(t) {
+    document.querySelectorAll('.mode button').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
+    $('enc').classList.toggle('hidden', t !== 'enc');
+    $('dec').classList.toggle('hidden', t !== 'dec');
+    log('mode → ' + t);
+  }
+  const state = { content: 'file', lock: 'key' };
+  document.querySelectorAll('.segs').forEach(seg => {
+    const group = seg.dataset.group;
+    seg.querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => {
+        seg.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+        b.classList.add('on');
+        state[group] = b.dataset.val;
+        applySegState();
+      });
+    });
+  });
+  function applySegState() {
+    $('encFileBox').classList.toggle('hidden', state.content !== 'file');
+    $('encTextBox').classList.toggle('hidden', state.content !== 'text');
+    $('encPwStep').classList.toggle('hidden', state.lock !== 'pw');
+    updateEncBtn();
+  }
+
+  const fullDrop = $('fullDrop');
+  let dragCounter = 0;
+  window.addEventListener('dragenter', (e) => {
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+    dragCounter++; fullDrop.classList.add('on');
+  });
+  window.addEventListener('dragleave', () => {
+    dragCounter = Math.max(0, dragCounter-1);
+    if (dragCounter === 0) fullDrop.classList.remove('on');
+  });
+  window.addEventListener('dragover', (e) => e.preventDefault());
+  window.addEventListener('drop', (e) => {
+    e.preventDefault(); dragCounter = 0; fullDrop.classList.remove('on');
+    const files = [...(e.dataTransfer?.files || [])];
+    if (!files.length) return;
+    if (files.length === 1 && files[0].name.toLowerCase().endsWith('.vrx')) {
+      switchMode('dec'); handleDecFile(files[0]);
+    } else {
+      switchMode('enc');
+      if (state.content !== 'file') {
+        state.content = 'file';
+        document.querySelector('[data-group="content"] [data-val="file"]').click();
+      }
+      addEncFiles(files);
+    }
+  });
+
+  const encFiles = [];
+  function renderEncList() {
+    const list = $('encFileList'); list.innerHTML = '';
+    encFiles.forEach((f, i) => {
+      const el = document.createElement('div');
+      el.className = 'fileitem';
+      el.innerHTML = `<span class="n">${escapeHtml(f.name)}</span><span class="s">${fmt(f.size)}</span><button class="rm" data-i="${i}" aria-label="Remove">×</button>`;
+      list.appendChild(el);
+    });
+    list.querySelectorAll('.rm').forEach(b =>
+      b.addEventListener('click', () => { encFiles.splice(+b.dataset.i, 1); renderEncList(); updateEncBtn(); }));
+    updateEncBtn();
+  }
+  function addEncFiles(files) {
+    let total = encFiles.reduce((s,f)=>s+f.size, 0);
+    for (const f of files) {
+      if (total + f.size > MAX_BYTES) { log('skipped ' + f.name + ' — exceeds 1 GB total', 'err'); continue; }
+      encFiles.push(f); total += f.size;
+      log('added · <span class="a">' + escapeHtml(f.name) + '</span> · ' + fmt(f.size));
+    }
+    renderEncList();
+  }
+  wireDrop($('encDrop'), $('encFile'), (files) => addEncFiles([...files]));
+  $('encText').addEventListener('input', updateEncBtn);
+  $('encPw').addEventListener('input', () => {
+    const s = pwStrength($('encPw').value);
+    $('pwbar').className = s.score ? 's'+s.score : '';
+    $('pwlabel').textContent = s.label || '—';
+    updateEncBtn();
+  });
+  function updateEncBtn() {
+    let ready = false;
+    if (state.content === 'file') ready = encFiles.length > 0;
+    else ready = $('encText').value.trim().length > 0;
+    if (state.lock === 'pw') ready = ready && $('encPw').value.length >= 6;
+    $('encBtn').disabled = !ready;
+  }
+  $('encBtn').addEventListener('click', doEncrypt);
+  async function doEncrypt() {
+    $('encBtn').disabled = true;
+    const prog = $('encProg'); prog.classList.add('on');
+    const bar = prog.querySelector('.bar');
+    const setP = (p) => bar.style.width = (p*100)+'%';
+    setP(0.05);
+    let keyBytes = null, plaintext = null;
+    const t0 = performance.now();
+    try {
+      let payloadType, meta, dataParts;
+      if (state.content === 'text') {
+        payloadType = PAYLOAD_TEXT; meta = { n: 'note.txt' };
+        dataParts = [enc.encode($('encText').value)];
+        log('preparing text payload');
+      } else if (encFiles.length === 1) {
+        payloadType = PAYLOAD_FILE;
+        meta = { n: sanitizeName(encFiles[0].name), m: encFiles[0].type || '' };
+        dataParts = [new Uint8Array(await encFiles[0].arrayBuffer())];
+        log('preparing file · ' + fmt(dataParts[0].length));
+      } else {
+        payloadType = PAYLOAD_MULTI; meta = { files: [] }; dataParts = [];
+        for (const f of encFiles) {
+          const b = new Uint8Array(await f.arrayBuffer());
+          meta.files.push({ n: sanitizeName(f.name), s: b.length, m: f.type || '' });
+          dataParts.push(b);
+        }
+        log('preparing bundle · ' + encFiles.length + ' files');
+      }
+      setP(0.3);
+      const metaJson = JSON.stringify(meta);
+      const metaBytes = enc.encode(metaJson);
+      const metaLen = new Uint8Array(4);
+      new DataView(metaLen.buffer).setUint32(0, metaBytes.length, false);
+      const dataTotal = dataParts.reduce((s,d)=>s+d.length, 0);
+      plaintext = new Uint8Array(1 + 4 + metaBytes.length + dataTotal);
+      let p = 0;
+      plaintext[p++] = payloadType;
+      plaintext.set(metaLen, p); p += 4;
+      plaintext.set(metaBytes, p); p += metaBytes.length;
+      for (const d of dataParts) { plaintext.set(d, p); p += d.length; zeroize(d); }
+      setP(0.45);
+      let mode, kdfId, salt, iters, cryptoKey;
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      if (state.lock === 'key') {
+        mode = MODE_KEY; kdfId = KDF_NONE; salt = new Uint8Array(16); iters = 0;
+        cryptoKey = await crypto.subtle.generateKey({ name:'AES-GCM', length:256 }, true, ['encrypt']);
+        keyBytes = new Uint8Array(await crypto.subtle.exportKey('raw', cryptoKey));
+        log('key · 256-bit generated (csprng)');
+      } else {
+        mode = MODE_PW; kdfId = KDF_PBKDF2;
+        salt = crypto.getRandomValues(new Uint8Array(16)); iters = PBKDF2_ITERS;
+        log('deriving key · pbkdf2-sha256 · ' + iters.toLocaleString() + ' iter');
+        cryptoKey = await deriveKey($('encPw').value, salt, iters);
+        $('encPw').value = '';
+      }
+      setP(0.65);
+      const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, cryptoKey, plaintext));
+      zeroize(plaintext); plaintext = null;
+      setP(0.85);
+      const iterBytes = new Uint8Array(4);
+      new DataView(iterBytes.buffer).setUint32(0, iters, false);
+      const out = new Uint8Array(40 + ct.length);
+      let o = 0;
+      out.set(MAGIC_V2, o); o += 4;
+      out[o++] = VERSION_V2; out[o++] = mode; out[o++] = kdfId; out[o++] = 0x00;
+      out.set(salt, o); o += 16;
+      out.set(iterBytes, o); o += 4;
+      out.set(iv, o); o += 12;
+      out.set(ct, o);
+      let outName;
+      if (payloadType === PAYLOAD_TEXT) outName = 'note.vrx';
+      else if (payloadType === PAYLOAD_FILE)
+        outName = sanitizeName(encFiles[0].name).replace(/\.[^.]+$/,'') + '.vrx';
+      else outName = 'bundle-' + new Date().toISOString().slice(0,10) + '.vrx';
+      download(out, outName); setP(1);
+      const ms = (performance.now() - t0).toFixed(0);
+      log('encrypted · ' + fmt(out.length) + ' · ' + ms + 'ms · ' + (mode===MODE_PW?'password':'key') + ' mode', 'ok');
+      log('saved · <span class="a">' + escapeHtml(outName) + '</span>', 'ok');
+      bumpOp();
+      if (mode === MODE_KEY) {
+        const keyB64 = b64.encode(keyBytes);
+        $('keyOut').textContent = keyB64;
+        $('keySection').classList.remove('hidden');
+        $('previewSection').classList.add('hidden');
+        $('copyKey').onclick = async () => {
+          try { await navigator.clipboard.writeText(keyB64);
+            const b = $('copyKey'); const old = b.textContent;
+            b.textContent = 'Copied'; setTimeout(()=>b.textContent=old, 1400);
+            log('key copied to clipboard');
+          } catch { log('clipboard blocked — select manually', 'err'); }
+        };
+        $('downKey').onclick = () => { download(enc.encode(keyB64), outName + '.key', 'text/plain'); log('key saved · ' + outName + '.key'); };
+        $('clearKey').onclick = () => {
+          $('keyOut').textContent = ''; $('keySection').classList.add('hidden');
+          zeroize(keyBytes); log('key removed from view', 'ok');
+        };
+        log('key visible — copy or save now, then clear', 'info');
+      } else {
+        log('password mode · nothing to display', 'ok');
+      }
+    } catch (err) {
+      console.error(err); log('error · ' + err.message, 'err');
+      zeroize(keyBytes); zeroize(plaintext);
+    } finally {
+      $('encBtn').disabled = false;
+      setTimeout(() => { prog.classList.remove('on'); bar.style.width='0'; }, 1200);
+    }
+  }
+
+  let decFile = null;
+  let decHeader = null;
+  wireDrop($('decDrop'), $('decFile'), (files) => { const f = files[0]; if (f) handleDecFile(f); });
+  async function handleDecFile(f) {
+    if (f.size > MAX_BYTES) { log('file exceeds 1 GB limit', 'err'); return; }
+    decFile = f;
+    const list = $('decFileList');
+    list.classList.remove('hidden');
+    list.innerHTML = `<div class="fileitem"><span class="n">${escapeHtml(f.name)}</span><span class="s">${fmt(f.size)}</span></div>`;
+    try {
+      const head = new Uint8Array(await f.slice(0, 40).arrayBuffer());
+      decHeader = parseHeader(head, f.size);
+      const info = $('decInfo');
+      info.classList.remove('hidden');
+      const modeName = decHeader.mode === MODE_PW ? 'Password' : 'Random Key';
+      info.innerHTML = `Format · <b>.vrx v${decHeader.version}</b> · Lock · <b>${modeName}</b>` +
+        (decHeader.mode === MODE_PW ? ' · ' + decHeader.iters.toLocaleString() + ' iter' : '');
+      $('decSecret').disabled = false;
+      $('decSecret').placeholder = decHeader.mode === MODE_PW ? 'Enter password' : 'Paste Base64 key';
+      $('decSecret').focus();
+      log('analysed · v' + decHeader.version + ' · ' + modeName.toLowerCase());
+    } catch (err) {
+      log('error · ' + err.message, 'err');
+      $('decInfo').classList.add('hidden');
+      $('decSecret').disabled = true;
+      decFile = null; decHeader = null;
+    }
+    updateDecBtn();
+  }
+  $('decSecret').addEventListener('input', updateDecBtn);
+  function updateDecBtn() {
+    $('decBtn').disabled = !(decFile && decHeader && $('decSecret').value.trim().length > 0);
+  }
+  function parseHeader(head, fileSize) {
+    if (head[0] === MAGIC_V1[0] && head[1] === MAGIC_V1[1] && head[2] === MAGIC_V1[2] && head[3] === 0x01) {
+      return { version: 1, mode: MODE_KEY, legacy: true };
+    }
+    for (let i=0;i<4;i++) if (head[i] !== MAGIC_V2[i]) throw new Error('not a valid .vrx file');
+    const version = head[4];
+    if (version !== VERSION_V2) throw new Error('unsupported version ' + version);
+    const mode = head[5];
+    const kdfId = head[6];
+    const salt = head.slice(8, 24);
+    const iters = new DataView(head.buffer, head.byteOffset+24, 4).getUint32(0, false);
+    const iv = head.slice(28, 40);
+    if (fileSize < 40 + 16) throw new Error('file too small');
+    return { version, mode, kdfId, salt, iters, iv, headerLen: 40 };
+  }
+  $('decBtn').addEventListener('click', doDecrypt);
+  async function doDecrypt() {
+    if (!decFile || !decHeader) return;
+    $('decBtn').disabled = true;
+    const prog = $('decProg'); prog.classList.add('on');
+    const bar = prog.querySelector('.bar');
+    const setP = (p) => bar.style.width = (p*100)+'%';
+    setP(0.1);
+    let keyBytes = null, plaintext = null;
+    const t0 = performance.now();
+    try {
+      const buf = new Uint8Array(await decFile.arrayBuffer());
+      setP(0.3);
+      if (decHeader.legacy) {
+        return await decryptLegacyV1(buf, setP, t0);
+      }
+      const { mode, iv, salt, iters } = decHeader;
+      const ct = buf.subarray(40);
+      let cryptoKey;
+      if (mode === MODE_KEY) {
+        try { keyBytes = b64.decode($('decSecret').value); }
+        catch { throw new Error('key is not valid Base64'); }
+        if (keyBytes.length !== 32) throw new Error('key must be 256-bit (32 bytes)');
+        cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name:'AES-GCM' }, false, ['decrypt']);
+      } else if (mode === MODE_PW) {
+        log('deriving key · ' + iters.toLocaleString() + ' iter');
+        cryptoKey = await deriveKey($('decSecret').value, salt, iters);
+      } else {
+        throw new Error('unknown mode ' + mode);
+      }
+      setP(0.6);
+      plaintext = new Uint8Array(await crypto.subtle.decrypt({ name:'AES-GCM', iv }, cryptoKey, ct));
+      setP(0.85);
+      let p = 0;
+      const payloadType = plaintext[p++];
+      const metaLen = new DataView(plaintext.buffer, plaintext.byteOffset+p, 4).getUint32(0, false);
+      p += 4;
+      const meta = JSON.parse(dec.decode(plaintext.subarray(p, p+metaLen)));
+      p += metaLen;
+      const ms = (performance.now() - t0).toFixed(0);
+      log('decrypted · ' + fmt(plaintext.length) + ' · ' + ms + 'ms', 'ok');
+      bumpOp();
+      setP(1);
+      $('previewSection').classList.remove('hidden');
+      $('keySection').classList.add('hidden');
+      const res = $('decResult');
+      res.innerHTML = '';
+      if (payloadType === PAYLOAD_TEXT) {
+        const text = dec.decode(plaintext.subarray(p));
+        const wrap = document.createElement('div');
+        wrap.className = 'preview';
+        wrap.innerHTML = `<div class="ph">Text · ${fmt(text.length)}</div>`;
+        const pre = document.createElement('pre');
+        pre.textContent = text;
+        wrap.appendChild(pre);
+        const row = document.createElement('div');
+        row.className = 'btn-row';
+        row.innerHTML = `<button class="btn" id="copyTxt">Copy Text</button><button class="btn" id="dlTxt">Save as .txt</button>`;
+        wrap.appendChild(row);
+        res.appendChild(wrap);
+        wrap.querySelector('#copyTxt').onclick = async () => {
+          try { await navigator.clipboard.writeText(text); log('text copied'); }
+          catch { log('clipboard blocked', 'err'); }
+        };
+        wrap.querySelector('#dlTxt').onclick = () =>
+          download(enc.encode(text), sanitizeName(meta.n||'note.txt'), 'text/plain');
+        log('text restored', 'ok');
+      } else if (payloadType === PAYLOAD_FILE) {
+        const data = plaintext.subarray(p);
+        const name = sanitizeName(meta.n || 'file');
+        const mime = meta.m || 'application/octet-stream';
+        renderFilePreview(res, name, mime, data);
+        download(data, name, mime);
+        log('restored · <span class="a">' + escapeHtml(name) + '</span>', 'ok');
+      } else if (payloadType === PAYLOAD_MULTI) {
+        const wrap = document.createElement('div');
+        wrap.className = 'preview';
+        wrap.innerHTML = `<div class="ph">Bundle · ${meta.files.length} files</div>`;
+        const list = document.createElement('div');
+        list.className = 'filelist';
+        let off = p;
+        const files = [];
+        for (const info of meta.files) {
+          const slice = plaintext.slice(off, off + info.s);
+          off += info.s;
+          files.push({ name: sanitizeName(info.n), mime: info.m||'', data: slice });
+          const el = document.createElement('div');
+          el.className = 'fileitem';
+          el.innerHTML = `<span class="n">${escapeHtml(info.n)}</span><span class="s">${fmt(info.s)}</span><button class="rm" data-i="${files.length-1}">↓</button>`;
+          list.appendChild(el);
+        }
+        wrap.appendChild(list);
+        const row = document.createElement('div');
+        row.className = 'btn-row';
+        row.innerHTML = `<button class="btn" id="dlAll">Save All</button>`;
+        wrap.appendChild(row);
+        res.appendChild(wrap);
+        list.querySelectorAll('.rm').forEach(b =>
+          b.addEventListener('click', () => {
+            const f = files[+b.dataset.i];
+            download(f.data, f.name, f.mime || 'application/octet-stream');
+          }));
+        wrap.querySelector('#dlAll').onclick = () => {
+          files.forEach((f, i) => setTimeout(() =>
+            download(f.data, f.name, f.mime || 'application/octet-stream'), i*150));
+          log('downloading ' + files.length + ' files');
+        };
+        log('bundle restored · ' + files.length + ' files', 'ok');
+      }
+      $('decSecret').value = '';
+      updateDecBtn();
+    } catch (err) {
+      console.error(err);
+      const msg = err.name === 'OperationError' ? 'incorrect key/password or file corrupted' : err.message;
+      log('error · ' + msg, 'err');
+    } finally {
+      zeroize(keyBytes); zeroize(plaintext);
+      $('decBtn').disabled = false;
+      setTimeout(() => { prog.classList.remove('on'); bar.style.width='0'; }, 1200);
+    }
+  }
+
+  async function decryptLegacyV1(buf, setP, t0) {
+    let keyBytes = null, plaintext = null;
+    try {
+      let off = 4;
+      const ver = buf[off++]; if (ver !== 0x01) throw new Error('legacy version mismatch');
+      const nameLen = new DataView(buf.buffer, buf.byteOffset+off, 2).getUint16(0, false);
+      off += 2;
+      const origName = sanitizeName(dec.decode(buf.subarray(off, off+nameLen)));
+      off += nameLen;
+      const iv = buf.subarray(off, off+12); off += 12;
+      const ct = buf.subarray(off);
+      try { keyBytes = b64.decode($('decSecret').value); }
+      catch { throw new Error('key is not valid Base64'); }
+      if (keyBytes.length !== 32) throw new Error('key must be 256-bit');
+      const key = await crypto.subtle.importKey('raw', keyBytes, { name:'AES-GCM' }, false, ['decrypt']);
+      setP(0.7);
+      plaintext = new Uint8Array(await crypto.subtle.decrypt({ name:'AES-GCM', iv }, key, ct));
+      setP(1);
+      $('previewSection').classList.remove('hidden');
+      $('keySection').classList.add('hidden');
+      const res = $('decResult');
+      res.innerHTML = '';
+      renderFilePreview(res, origName, 'application/octet-stream', plaintext);
+      download(plaintext, origName);
+      const ms = (performance.now() - t0).toFixed(0);
+      log('v1 restored · <span class="a">' + escapeHtml(origName) + '</span> · ' + ms + 'ms', 'ok');
+      bumpOp();
+      $('decSecret').value = '';
+    } finally {
+      zeroize(keyBytes); zeroize(plaintext);
+    }
+  }
+
+  function renderFilePreview(container, name, mime, data) {
+    const wrap = document.createElement('div');
+    wrap.className = 'preview';
+    wrap.innerHTML = `<div class="ph">${escapeHtml(mime||'file')} · ${fmt(data.length)} · ${escapeHtml(name)}</div>`;
+    if (mime.startsWith('image/')) {
+      const blob = new Blob([data], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const img = document.createElement('img');
+      img.src = url; img.alt = name;
+      img.onload = () => setTimeout(() => URL.revokeObjectURL(url), 60000);
+      wrap.appendChild(img);
+    } else if (mime.startsWith('text/') || /\.(txt|md|json|csv|log|xml|yaml|yml)$/i.test(name)) {
+      try {
+        const text = dec.decode(data.subarray(0, Math.min(data.length, 8000)));
+        const pre = document.createElement('pre');
+        pre.textContent = text + (data.length > 8000 ? '\n\n[…truncated]' : '');
+        wrap.appendChild(pre);
+      } catch {
+        const info = document.createElement('div');
+        info.style.cssText = 'color:var(--dim);font-size:12px';
+        info.textContent = 'Preview not available.';
+        wrap.appendChild(info);
+      }
+    } else {
+      const info = document.createElement('div');
+      info.style.cssText = 'color:var(--dim);font-size:12px;margin-top:6px';
+      info.textContent = 'No preview — file downloaded.';
+      wrap.appendChild(info);
+    }
+    container.appendChild(wrap);
+  }
+
+  async function deriveKey(password, salt, iters) {
+    const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), { name:'PBKDF2' }, false, ['deriveKey']);
+    return await crypto.subtle.deriveKey(
+      { name:'PBKDF2', salt, iterations:iters, hash:'SHA-256' },
+      baseKey,
+      { name:'AES-GCM', length:256 },
+      false,
+      ['encrypt','decrypt']
+    );
+  }
+
+  function pwStrength(pw) {
+    if (!pw) return { score:0, label:'' };
+    let score = 0;
+    if (pw.length >= 8)  score++;
+    if (pw.length >= 12) score++;
+    if (pw.length >= 16) score++;
+    let variety = 0;
+    if (/[a-z]/.test(pw)) variety++;
+    if (/[A-Z]/.test(pw)) variety++;
+    if (/[0-9]/.test(pw)) variety++;
+    if (/[^A-Za-z0-9]/.test(pw)) variety++;
+    if (variety >= 3) score++;
+    score = Math.min(4, score);
+    const labels = ['','very weak','weak','ok','strong'];
+    return { score, label: labels[score] || '' };
+  }
+
+  function wireDrop(dropEl, inputEl, onFiles) {
+    ['dragenter','dragover'].forEach(ev =>
+      dropEl.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dropEl.classList.add('drag'); }));
+    ['dragleave','drop'].forEach(ev =>
+      dropEl.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); dropEl.classList.remove('drag'); }));
+    dropEl.addEventListener('drop', e => {
+      const files = e.dataTransfer?.files;
+      if (files?.length) { inputEl.files = files; onFiles(files); }
+    });
+    inputEl.addEventListener('change', () => { if (inputEl.files?.length) onFiles(inputEl.files); });
+  }
+
+  window.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files = [];
+    for (const it of items) {
+      if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); }
+    }
+    if (files.length) {
+      switchMode('enc');
+      if (state.content !== 'file') {
+        document.querySelector('[data-group="content"] [data-val="file"]').click();
+      }
+      addEncFiles(files);
+      log('pasted ' + files.length + ' file(s) from clipboard');
+    }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key.toLowerCase() === 'e') { e.preventDefault(); switchMode('enc'); }
+    else if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); switchMode('dec'); }
+    else if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); logEl.innerHTML=''; logCount=0; $('logCount').textContent=0; log('cleared'); }
+    else if (e.key === 'Escape') {
+      $('keyOut').textContent = '';
+      $('keySection').classList.add('hidden');
+      $('encPw').value = ''; $('decSecret').value = '';
+      log('secrets cleared from view');
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    $('encPw').value = ''; $('decSecret').value = ''; $('keyOut').textContent = '';
+  });
+
+  document.querySelectorAll('.topnav a[href^="#"], .footer-col a[href^="#"]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const id = a.getAttribute('href').slice(1);
+      const el = document.getElementById(id);
+      if (el) { e.preventDefault(); el.scrollIntoView({ behavior:'smooth', block:'start' }); }
+    });
+  });
+
+  applySegState();
+})();
+</script>
+</body>
+</html>
